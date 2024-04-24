@@ -263,6 +263,9 @@ def sample_batch(
     # Hint: Use torch.randint to generate indices.                          #
     #########################################################################
     # Replace "pass" statement with your code
+    batch_indecies = torch.randint(0, num_train, size=(batch_size, ))
+    X_batch = X[batch_indecies]
+    y_batch = y[batch_indecies]
     pass
     #########################################################################
     #                       END OF YOUR CODE                                #

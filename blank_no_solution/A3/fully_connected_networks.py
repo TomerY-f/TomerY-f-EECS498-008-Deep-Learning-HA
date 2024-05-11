@@ -39,6 +39,10 @@ class Linear(object):
         # You will need to reshape the input into rows.                      #
         ######################################################################
         # Replace "pass" statement with your code
+        x_shape = x.shape
+        x_rows_reshape = x.view(x_shape[0], x_shape[1:].numel()) # x_shape[1:].numel() can be replaced with -1.
+
+        out = torch.mm(x_rows_reshape, w) + b
         pass
         ######################################################################
         #                        END OF YOUR CODE                            #
@@ -69,6 +73,12 @@ class Linear(object):
         ##################################################
         # Replace "pass" statement with your code
         pass
+        x_shape = x.shape
+        x_rows_reshape = x.view(x_shape[0], x_shape[1:].numel())
+
+        dx = torch.mm(dout, w.t()).reshape(x.shape)
+        dw = torch.mm(x_rows_reshape.t(), dout)
+        db = torch.sum(dout, dim=0).t()
         ##################################################
         #                END OF YOUR CODE                #
         ##################################################

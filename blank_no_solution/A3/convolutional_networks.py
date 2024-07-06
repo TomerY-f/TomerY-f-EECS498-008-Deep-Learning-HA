@@ -1233,6 +1233,11 @@ class SpatialBatchNorm(object):
         # ours is less than five lines.                                #
         ################################################################
         # Replace "pass" statement with your code
+        N, C, H, W = x.shape
+        tmp, cache = BatchNorm.forward(
+            x.permute(0, 3, 2, 1).reshape((N * H * W, C)), gamma, beta, bn_param
+        )
+        out = tmp.reshape(N, W, H, C).permute(0, 3, 2, 1)
         pass
         ################################################################
         #                       END OF YOUR CODE                       #
@@ -1248,11 +1253,11 @@ class SpatialBatchNorm(object):
         - dout: Upstream derivatives, of shape (N, C, H, W)
         - cache: Values from the forward pass
         Returns a tuple of:
-        - dx_padded: Gradient with respect to inputs, of shape (N, C, H, W)
+        - dx: Gradient with respect to inputs, of shape (N, C, H, W)
         - dgamma: Gradient with respect to scale parameter, of shape (C,)
         - dbeta: Gradient with respect to shift parameter, of shape (C,)
         """
-        dx_padded, dgamma, dbeta = None, None, None
+        dx, dgamma, dbeta = None, None, None
 
         #################################################################
         # TODO: Implement the backward pass for spatial batch           #
@@ -1264,12 +1269,19 @@ class SpatialBatchNorm(object):
         # ours is less than five lines.                                 #
         #################################################################
         # Replace "pass" statement with your code
+        N, C, H, W = dout.shape
+
+        tmp, dgamma, dbeta = BatchNorm.backward(
+            dout.permute(0, 3, 2, 1).reshape((N * H * W, C)), cache
+        )
+        dx = tmp.reshape(N, W, H, C).permute(0, 3, 2, 1)
+
         pass
         ##################################################################
         #                       END OF YOUR CODE                         #
         ##################################################################
 
-        return dx_padded, dgamma, dbeta
+        return dx, dgamma, dbeta
 
 
 ##################################################################

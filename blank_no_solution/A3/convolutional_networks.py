@@ -5,7 +5,7 @@ WARNING: you SHOULD NOT use ".to()" or ".cuda()" in each implementation block.
 
 import torch
 from a3_helper import softmax_loss
-from fully_connected_networks import Linear_ReLU, Linear, Solver, adam, ReLU
+from fully_connected_networks import Linear_ReLU, Linear, Solver, adam, ReLU, sgd_momentum
 
 
 def hello_convolutional_networks():
@@ -530,6 +530,13 @@ class DeepConvNet(object):
             )
 
         self.params[f"b{1}"] = torch.zeros(num_filters[0], dtype=dtype, device=device)
+        if self.batchnorm:
+                self.params[f"gamma{1}"] = torch.ones(
+                    num_filters[0], dtype=dtype, device=device
+                )
+                self.params[f"beta{1}"] = torch.zeros(
+                    num_filters[0], dtype=dtype, device=device
+                )
 
         for i in range(2, self.num_layers):
             if weight_scale == "kaiming":
@@ -554,6 +561,13 @@ class DeepConvNet(object):
             self.params[f"b{i}"] = torch.zeros(
                 num_filters[i - 1], dtype=dtype, device=device
             )
+            if self.batchnorm:
+                self.params[f"gamma{i}"] = torch.ones(
+                    num_filters[i - 1], dtype=dtype, device=device
+                )
+                self.params[f"beta{i}"] = torch.zeros(
+                    num_filters[i - 1], dtype=dtype, device=device
+                )
 
         down_sampling = len(max_pools)
 
@@ -876,7 +890,7 @@ def find_overfit_parameters():
     return weight_scale, learning_rate
 
 
-def create_convolutional_solver_instance(data_dict, dtype, device):
+def create_convolutional_solver_instance(data_dict, dtype, device, batchnorm: bool=False):
     model = None
     solver = None
     #########################################################
@@ -892,12 +906,15 @@ def create_convolutional_solver_instance(data_dict, dtype, device):
     model = DeepConvNet(
         input_dims=input_dims,
         num_classes=10,
-        num_filters=[32, 64, 128],
-        max_pools=[0, 1],
+        num_filters=[8, 32, 32, 64, 64, 128],
+        max_pools=[0, 1, 3, 5],
+        # num_filters=[8, 8, 16, 16, 32, 32],
+        # max_pools=[1, 3, 5],
         weight_scale=weight_scale,
         reg=1e-5,
         dtype=dtype,
         device=device,
+        batchnorm=batchnorm
     )
 
     solver = Solver(

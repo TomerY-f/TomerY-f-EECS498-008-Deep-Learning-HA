@@ -117,3 +117,8 @@ dmypy.json
 # Datasets
 *cifar-10-python.tar.gz
 *cifar-10-batches-py
+## Voc
+*VOCdevkit/
+*voc07_train.json
+*voc07_val.json
+*VOCtrainval_06-Nov-2007.tar

@@ -59,12 +59,33 @@ class FCOSPredictionNetwork(nn.Module):
         # Fill these.
         stem_cls = []
         stem_box = []
+        
         # Replace "pass" statement with your code
-        pass
+        for stem_channel in stem_channels:
+            stem_cls = nn.Sequential(
+                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
+                nn.ReLU(),
+            )
+        stem_box = stem_cls
+
+        for module in [stem_cls, stem_box]:
+            if isinstance(module, nn.Conv2d):
+                nn.init.normal_(module.weight, mean=0, std=0.01)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
 
         # Wrap the layers defined by student into a `nn.Sequential` module:
-        self.stem_cls = nn.Sequential(*stem_cls)
-        self.stem_box = nn.Sequential(*stem_box)
+        self.stem_cls = stem_cls
+        self.stem_box = stem_box
+        # self.stem_cls = nn.Sequential(*stem_cls)
+        # self.stem_box = nn.Sequential(*stem_box)
 
         ######################################################################
         # TODO: Create THREE 3x3 conv layers for individually predicting three
@@ -87,7 +108,22 @@ class FCOSPredictionNetwork(nn.Module):
         self.pred_box = None  # Box regression conv
         self.pred_ctr = None  # Centerness conv
 
+         # 1. Conv layer for predicting object class logits
+        self.pred_cls = nn.Conv2d(in_channels, num_classes, kernel_size=3, stride=1, padding=1)
+        
+        # 2. Conv layer for predicting box regression deltas (4 outputs for LTRB)
+        self.pred_box = nn.Conv2d(in_channels, 4, kernel_size=3, stride=1, padding=1)
+        
+        # 3. Conv layer for predicting centerness logits (1 output)
+        self.pred_ctr = nn.Conv2d(in_channels, 1, kernel_size=3, stride=1, padding=1)
         # Replace "pass" statement with your code
+        nn.init.normal_(self.pred_cls.weight, mean=0, std=0.01)
+        nn.init.constant_(self.pred_cls.bias, 0)
+        nn.init.normal_(self.pred_box.weight, mean=0, std=0.01)
+        nn.init.constant_(self.pred_box.bias, 0)
+        nn.init.normal_(self.pred_ctr.weight, mean=0, std=0.01)
+        nn.init.constant_(self.pred_ctr.bias, 0)
+        
         pass
         ######################################################################
         #                           END OF YOUR CODE                         #

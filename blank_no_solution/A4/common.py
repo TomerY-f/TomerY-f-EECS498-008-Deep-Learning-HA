@@ -18,7 +18,7 @@ def hello_common():
 
 
 class DetectorBackboneWithFPN(nn.Module):
-    r"""
+    """
     Detection backbone network: A tiny RegNet model coupled with a Feature
     Pyramid Network (FPN). This model takes in batches of input images with
     shape `(B, 3, H, W)` and gives features from three different FPN levels
@@ -81,7 +81,49 @@ class DetectorBackboneWithFPN(nn.Module):
         # This behaves like a Python dict, but makes PyTorch understand that
         # there are trainable weights inside it.
         # Add THREE lateral 1x1 conv and THREE output 3x3 conv layers.
-        self.fpn_params = nn.ModuleDict()
+        self.fpn_params = nn.ModuleDict(
+            {
+                "conv2d_1by1_c3": nn.Conv2d(
+                    in_channels=dummy_out_shapes[0][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=(1, 1),
+                    stride=1,
+                ),
+                "conv2d_1by1_c4": nn.Conv2d(
+                    in_channels=dummy_out_shapes[1][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=(1, 1),
+                    stride=1,
+                ),
+                "conv2d_1by1_c5": nn.Conv2d(
+                    in_channels=dummy_out_shapes[2][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=(1, 1),
+                    stride=1,
+                ),
+                "conv2d_3by3_c3": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=(3, 3),
+                    stride=1,
+                    padding=1,
+                ),
+                "conv2d_3by3_c4": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=(3, 3),
+                    stride=1,
+                    padding=1,
+                ),
+                "conv2d_3by3_c5": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=(3, 3),
+                    stride=1,
+                    padding=1,
+                ),
+            }
+        )
 
         # Replace "pass" statement with your code
         pass
@@ -91,7 +133,7 @@ class DetectorBackboneWithFPN(nn.Module):
 
     @property
     def fpn_strides(self):
-        """
+        """o
         Total stride up to the FPN level. For a fixed ConvNet, these values
         are invariant to input image size. You may access these values freely
         to implement your logic in FCOS / Faster R-CNN.
@@ -109,7 +151,24 @@ class DetectorBackboneWithFPN(nn.Module):
         # (c3, c4, c5) and FPN conv layers created above.                    #
         # HINT: Use `F.interpolate` to upsample FPN features.                #
         ######################################################################
-
+        resnet_output = self.backbone(images)
+        p3_ = self.fpn_params['conv2d_1by1_c3'](resnet_output['c3'])
+        p4_ = self.fpn_params['conv2d_1by1_c4'](resnet_output['c4'])
+        p5_ = self.fpn_params['conv2d_1by1_c5'](resnet_output['c5'])
+        
+        fpn_feats["p5"] = self.fpn_params["conv2d_3by3_c5"](p5_)
+        
+        # See architecture scheme (top down and then outputs go to the heads)
+        p3_top_down = F.interpolate(
+              p5_, size=(int(p3_.shape[-2]), int(p3_.shape[-1])),
+              mode='nearest'
+          )
+        fpn_feats["p3"] = self.fpn_params["conv2d_3by3_c5"](p3_ + p3_top_down)  
+        p4_top_down = F.interpolate(
+              p5_, size=(int(p4_.shape[-2]), int(p4_.shape[-1])),
+              mode='nearest'
+          )
+        fpn_feats["p4"] = self.fpn_params["conv2d_3by3_c5"](p4_ + p4_top_down)  
         # Replace "pass" statement with your code
         pass
         ######################################################################

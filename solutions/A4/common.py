@@ -1,4 +1,4 @@
-"""
+ """
 This module contains classes and functions that are common across both, one-stage
 and two-stage detector implementations. You have to implement some parts here -
 walk through the notebooks and you will find instructions on *when* to implement
@@ -122,6 +122,7 @@ class DetectorBackboneWithFPN(nn.Module):
         p4_ = self.fpn_params["conv1by1c4"](resnet_out['c4'])
         p5_ = self.fpn_params["conv1by1c5"](resnet_out['c5'])
         fpn_feats["p5"] = self.fpn_params["conv3by3c5"](p5_)
+        
         p3_top_down = F.interpolate(
               p5_, size=(int(p3_.shape[-2]), int(p3_.shape[-1])),
               mode='nearest'

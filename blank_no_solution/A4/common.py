@@ -216,6 +216,22 @@ def get_fpn_location_coords(
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
         # Replace "pass" statement with your code
+        _, _, H, W = feat_shape
+        
+        # Create row and column tensors for the feature map grid
+        row_tensor = torch.arange(H, device=device, dtype=dtype).repeat(W, 1).t()  # Shape: (H, W)
+        col_tensor = torch.arange(W, device=device, dtype=dtype).repeat(H, 1)      # Shape: (H, W)
+        
+        # Flatten the row and column tensors to create a list of (x, y) coordinates
+        row_tensor = row_tensor.reshape(-1)  # Shape: (H * W,)
+        col_tensor = col_tensor.reshape(-1)  # Shape: (H * W,)
+        
+        # Stack row and column to form (xc, yc) pairs and convert to input image coordinates
+        idx_tensor = torch.stack([col_tensor, row_tensor], dim=1).reshape(-1, 2)  # Shape: (H * W, 2)
+        idx_tensor = (idx_tensor + 0.5) * level_stride  # Adjust using stride, add 0.5 to get center
+        
+        # Store the resulting tensor in the dictionary
+        location_coords[level_name] = idx_tensor        
         pass
         ######################################################################
         #                             END OF YOUR CODE                       #

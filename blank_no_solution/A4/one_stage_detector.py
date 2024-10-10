@@ -401,6 +401,24 @@ def fcos_make_centerness_targets(deltas: torch.Tensor):
     # TODO: Implement the centerness calculation logic.                      #
     ##########################################################################
     centerness = None
+
+    centerness = torch.zeros_like(deltas[:, 0])
+    
+    deltas_left, deltas_top, deltas_right, deltas_bottom = (
+        deltas[:, 0],
+        deltas[:, 1],
+        deltas[:, 2],
+        deltas[:, 3],
+    )
+
+    centerness = torch.sqrt(
+        torch.min(deltas_left, deltas_right)
+        * torch.min(deltas_top, deltas_bottom)
+        / torch.max(deltas_left, deltas_right)
+        / torch.max(deltas_top, deltas_bottom)
+    )
+
+    centerness[deltas[:,-1] == -1] = -1
     # Replace "pass" statement with your code
     pass
     ##########################################################################

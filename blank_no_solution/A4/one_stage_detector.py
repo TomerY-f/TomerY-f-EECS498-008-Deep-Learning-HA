@@ -304,6 +304,12 @@ def fcos_get_deltas_from_locations(
     # Set this to Tensor of shape (N, 4) giving deltas (left, top, right, bottom)
     # from the locations to GT box edges, normalized by FPN stride.
     deltas = None
+    xc, yc = locations[:, 0].unsqueeze(1), locations[:, 1].unsqueeze(1)
+    left, top, right, bottom = gt_boxes[:, 0].unsqueeze(1), gt_boxes[:, 1].unsqueeze(1), gt_boxes[:, 2].unsqueeze(1), gt_boxes[:, 3].unsqueeze(1)
+    left, top, right, bottom = (xc - left) / stride, (yc - top) / stride, (right - xc) / stride, (bottom - yc) / stride
+    deltas = torch.cat((left, top, right, bottom), dim=1)
+    #Background:
+    deltas[gt_boxes[:, 0] == -1] = -1
 
     # Replace "pass" statement with your code
     pass
@@ -348,6 +354,24 @@ def fcos_apply_deltas_to_locations(
     # box. Make sure to clip them to zero.                                   #
     ##########################################################################
     # Replace "pass" statement with your code
+    output_boxes = None
+    xc, yc = locations[:, 0].unsqueeze(1), locations[:, 1].unsqueeze(1)
+
+    # Calibrate negative predictions
+    deltas.clip(min=0)
+    deltas_left, deltas_top, deltas_right, deltas_bottom = (
+        deltas[:, 0].unsqueeze(1),
+        deltas[:, 1].unsqueeze(1),
+        deltas[:, 2].unsqueeze(1),
+        deltas[:, 3].unsqueeze(1),
+    )
+
+    boxes_left = xc - deltas_left*stride
+    boxes_top = yc - deltas_top*stride
+    boxes_right = deltas_right*stride + xc
+    boxes_bottom = deltas_bottom*stride + yc
+
+    output_boxes = torch.cat((boxes_left, boxes_top, boxes_right, boxes_bottom), dim=1)
     pass
     ##########################################################################
     #                             END OF YOUR CODE                           #

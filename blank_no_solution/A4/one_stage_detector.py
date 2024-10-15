@@ -84,8 +84,6 @@ class FCOSPredictionNetwork(nn.Module):
         # Wrap the layers defined by student into a `nn.Sequential` module:
         self.stem_cls = stem_cls
         self.stem_box = stem_box
-        # self.stem_cls = nn.Sequential(*stem_cls)
-        # self.stem_box = nn.Sequential(*stem_box)
 
         ######################################################################
         # TODO: Create THREE 3x3 conv layers for individually predicting three
@@ -449,6 +447,12 @@ class FCOS(nn.Module):
         # Feel free to delete these two lines: (but keep variable names same)
         self.backbone = None
         self.pred_net = None
+        self.backbone = DetectorBackboneWithFPN(out_channels=fpn_channels)
+        self.pred_net = FCOSPredictionNetwork(
+            num_classes=num_classes,
+            in_channels=fpn_channels,
+            stem_channels=stem_channels,
+        )
         # Replace "pass" statement with your code
         pass
         ######################################################################
@@ -493,6 +497,9 @@ class FCOS(nn.Module):
         ######################################################################
         # Feel free to delete this line: (but keep variable names same)
         pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits = None, None, None
+
+        fpn_features = self.backbone.forward(images=images)
+        pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits = self.pred_net.forward(fpn_features)
         # Replace "pass" statement with your code
         pass
 
@@ -505,6 +512,7 @@ class FCOS(nn.Module):
         ######################################################################
         # Feel free to delete this line: (but keep variable names same)
         locations_per_fpn_level = None
+        locations_per_fpn_level = get_fpn_location_coords(fpn_features, self.backbone.fpn_strides, device=images.device)
         # Replace "pass" statement with your code
         pass
         ######################################################################
@@ -514,15 +522,15 @@ class FCOS(nn.Module):
         if not self.training:
             # During inference, just go to this method and skip rest of the
             # forward pass.
-            # fmt: off
+            # fmt off - [feature map transformation not activated, only scores predictions] 
             return self.inference(
                 images, locations_per_fpn_level,
                 pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits,
                 test_score_thresh=test_score_thresh,
                 test_nms_thresh=test_nms_thresh,
             )
-            # fmt: on
-
+        
+        # fmt: on
         ######################################################################
         # TODO: Assign ground-truth boxes to feature locations. We have this
         # implemented in a `fcos_match_locations_to_gt`. This operation is NOT
@@ -531,6 +539,7 @@ class FCOS(nn.Module):
         # List of dictionaries with keys {"p3", "p4", "p5"} giving matched
         # boxes for locations per FPN level, per image. Fill this list:
         matched_gt_boxes = []
+            
         # Replace "pass" statement with your code
         pass
 
@@ -661,6 +670,16 @@ class FCOS(nn.Module):
                 None,  # Need tensors of shape: (N, 4) (N, ) (N, )
             )
 
+            # level_locations = locations_per_fpn_level[level_name]
+            # level_cls_logits = pred_cls_logits[level_name][0]
+            # level_deltas = pred_boxreg_deltas[level_name][0]
+            # level_ctr_logits = pred_ctr_logits[level_name][0]
+            # images: torch.Tensor,
+            # test_score_thresh: float = 0.3,
+            # test_nms_thresh: float = 0.5,
+           
+            # level_pred_scores = level_cls_logits.sort
+           
             # Compute geometric mean of class logits and centerness:
             level_pred_scores = torch.sqrt(
                 level_cls_logits.sigmoid_() * level_ctr_logits.sigmoid_()

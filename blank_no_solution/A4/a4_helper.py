@@ -207,8 +207,9 @@ def train_detector(
 
     # Optimizer: use SGD with momentum.
     # Use SGD with momentum:
+    params = filter(lambda p: p.requires_grad, detector.parameters())
     optimizer = optim.SGD(
-        filter(lambda p: p.requires_grad, detector.parameters()),
+        params=params,
         momentum=0.9,
         lr=learning_rate,
         weight_decay=weight_decay,

@@ -61,18 +61,12 @@ class FCOSPredictionNetwork(nn.Module):
         stem_box = []
         
         # Replace "pass" statement with your code
-        for stem_channel in stem_channels:
-            stem_cls = nn.Sequential(
-                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
-                nn.ReLU(),
-                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
-                nn.ReLU(),
-                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
-                nn.ReLU(),
-                nn.Conv2d(in_channels=in_channels, out_channels=stem_channel, kernel_size=(3,3), stride=1, padding=0),
-                nn.ReLU(),
-            )
-        stem_box = stem_cls
+        for out_channels in stem_channels:
+            stem_cls.append(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1))
+            stem_cls.append(nn.ReLU())
+            stem_box.append(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1))
+            stem_box.append(nn.ReLU())
+            in_channels = out_channels  # Update for next layer
 
         for module in [stem_cls, stem_box]:
             if isinstance(module, nn.Conv2d):
@@ -82,8 +76,8 @@ class FCOSPredictionNetwork(nn.Module):
 
 
         # Wrap the layers defined by student into a `nn.Sequential` module:
-        self.stem_cls = stem_cls
-        self.stem_box = stem_box
+        self.stem_cls = nn.Sequential(*stem_cls)
+        self.stem_box = nn.Sequential(*stem_box)
 
         ######################################################################
         # TODO: Create THREE 3x3 conv layers for individually predicting three
@@ -169,6 +163,19 @@ class FCOSPredictionNetwork(nn.Module):
         centerness_logits = {}
 
         # Replace "pass" statement with your code
+        for fpn_level in feats_per_fpn_level.keys():
+            class_logits[fpn_level] = self.stem_cls(feats_per_fpn_level[fpn_level])
+            class_logits[fpn_level] = self.pred_cls(class_logits[fpn_level])
+            B, C, H, W = class_logits[fpn_level].shape
+            class_logits[fpn_level] = class_logits[fpn_level].permute(0, 2, 3, 1).reshape(B, H*W, C)
+
+            box_pred = self.stem_box(feats_per_fpn_level[fpn_level])
+
+            boxreg_deltas[fpn_level] = self.pred_box(box_pred)
+            centerness_logits[fpn_level] = self.pred_ctr(box_pred)
+
+            boxreg_deltas[fpn_level] = boxreg_deltas[fpn_level].permute(0, 2, 3, 1).reshape(B, H*W, -1)
+            centerness_logits[fpn_level] = centerness_logits[fpn_level].permute(0, 2, 3, 1).reshape(B, H*W, -1)
         pass
         ######################################################################
         #                           END OF YOUR CODE                         #
@@ -466,7 +473,7 @@ class FCOS(nn.Module):
     def forward(
         self,
         images: torch.Tensor,
-        gt_boxes: Optional[torch.Tensor] = None,
+        gt_boxes_per_image: Optional[torch.Tensor] = None,
         test_score_thresh: Optional[float] = None,
         test_nms_thresh: Optional[float] = None,
     ):
@@ -477,7 +484,7 @@ class FCOS(nn.Module):
                 `gt_boxes[i, j] = (x1, y1, x2, y2, C)` gives information about
                 the `j`th object in `images[i]`. The position of the top-left
                 corner of the box is `(x1, y1)` and the position of bottom-right
-                corner of the box is `(x2, x2)`. These coordinates are
+                corner of the box is `(x2, y2)`. These coordinates are
                 real-valued in `[H, W]`. `C` is an integer giving the category
                 label for this bounding box. Not provided during inference.
             test_score_thresh: During inference, discard predictions with a
@@ -498,8 +505,8 @@ class FCOS(nn.Module):
         # Feel free to delete this line: (but keep variable names same)
         pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits = None, None, None
 
-        fpn_features = self.backbone.forward(images=images)
-        pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits = self.pred_net.forward(fpn_features)
+        fpn_features = self.backbone(images=images)
+        pred_cls_logits, pred_boxreg_deltas, pred_ctr_logits = self.pred_net(fpn_features)
         # Replace "pass" statement with your code
         pass
 
@@ -512,7 +519,12 @@ class FCOS(nn.Module):
         ######################################################################
         # Feel free to delete this line: (but keep variable names same)
         locations_per_fpn_level = None
-        locations_per_fpn_level = get_fpn_location_coords(fpn_features, self.backbone.fpn_strides, device=images.device)
+
+        fpn_feats_shapes = {
+          level_name: fpn_features.shape for level_name, fpn_features in fpn_features.items()
+        }
+
+        locations_per_fpn_level = get_fpn_location_coords(fpn_feats_shapes, self.backbone.fpn_strides, device=images.device)
         # Replace "pass" statement with your code
         pass
         ######################################################################
@@ -539,13 +551,24 @@ class FCOS(nn.Module):
         # List of dictionaries with keys {"p3", "p4", "p5"} giving matched
         # boxes for locations per FPN level, per image. Fill this list:
         matched_gt_boxes = []
-            
+        for boxes_batch in range(gt_boxes_per_image.shape[0]):
+            matched_gt_boxes.append(fcos_match_locations_to_gt(locations_per_fpn_level=locations_per_fpn_level, 
+                                                        strides_per_fpn_level=self.backbone.fpn_strides, 
+                                                        gt_boxes=gt_boxes_per_image[boxes_batch]))
         # Replace "pass" statement with your code
         pass
 
         # Calculate GT deltas for these matched boxes. Similar structure
         # as `matched_gt_boxes` above. Fill this list:
         matched_gt_deltas = []
+        for gt_boxes_per_image in matched_gt_boxes:
+          delta_p3 = fcos_get_deltas_from_locations(locations_per_fpn_level\
+          ['p3'], gt_boxes_per_image['p3'],  self.backbone.fpn_strides['p3'])
+          delta_p4 = fcos_get_deltas_from_locations(locations_per_fpn_level\
+          ['p4'], gt_boxes_per_image['p4'],  self.backbone.fpn_strides['p4'])  
+          delta_p5 = fcos_get_deltas_from_locations(locations_per_fpn_level\
+          ['p5'], gt_boxes_per_image['p5'],  self.backbone.fpn_strides['p5'])    
+          matched_gt_deltas.append({'p3': delta_p3, 'p4': delta_p4, 'p5': delta_p5})  
         # Replace "pass" statement with your code
         pass
         ######################################################################

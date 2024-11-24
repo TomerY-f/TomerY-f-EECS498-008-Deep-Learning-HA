@@ -589,7 +589,7 @@ class FCOS(nn.Module):
         pred_boxreg_deltas = self._cat_across_fpn_levels(pred_boxreg_deltas)
         pred_ctr_logits = self._cat_across_fpn_levels(pred_ctr_logits)
 
-        # Perform EMA update of normalizer by number of positive locations.
+        # Perform EMA (exponantial moving avarage) update of normalizer by number of positive locations.
         num_pos_locations = (matched_gt_boxes[:, :, 4] != -1).sum()
         pos_loc_per_image = num_pos_locations.item() / images.shape[0]
         self._normalizer = 0.9 * self._normalizer + 0.1 * pos_loc_per_image
@@ -602,7 +602,17 @@ class FCOS(nn.Module):
         # Feel free to delete this line: (but keep variable names same)
         loss_cls, loss_box, loss_ctr = None, None, None
 
-        # Replace "pass" statement with your code
+        N, WH, C = pred_cls_logits.shape
+        B, WH, _ = matched_gt_deltas.shape
+        center_gt = fcos_make_centerness_targets(matched_gt_deltas.reshape(-1,4)).reshape(B,WH,1)
+        gt_cls_onehot = torch.zeros((N*WH, C+1),device=pred_cls_logits.device)
+        gt_cls_onehot[torch.arange(N*WH),matched_gt_boxes[:,:,-1].reshape(-1).long()] = 1
+        label = gt_cls_onehot[:,:-1].reshape(N,WH,-1)
+        loss_cls = sigmoid_focal_loss(pred_cls_logits, label.float())
+        loss_box = 0.25 * F.smooth_l1_loss(pred_boxreg_deltas, matched_gt_deltas, reduction="none")
+        loss_box[matched_gt_deltas < 0] *= 0.0
+        loss_ctr = F.binary_cross_entropy_with_logits(pred_ctr_logits, center_gt, reduction="none")
+        loss_ctr[center_gt < 0] *= 0.0
         pass
         ######################################################################
         #                            END OF YOUR CODE                        #
@@ -692,16 +702,6 @@ class FCOS(nn.Module):
                 None,
                 None,  # Need tensors of shape: (N, 4) (N, ) (N, )
             )
-
-            # level_locations = locations_per_fpn_level[level_name]
-            # level_cls_logits = pred_cls_logits[level_name][0]
-            # level_deltas = pred_boxreg_deltas[level_name][0]
-            # level_ctr_logits = pred_ctr_logits[level_name][0]
-            # images: torch.Tensor,
-            # test_score_thresh: float = 0.3,
-            # test_nms_thresh: float = 0.5,
-           
-            # level_pred_scores = level_cls_logits.sort
            
             # Compute geometric mean of class logits and centerness:
             level_pred_scores = torch.sqrt(
@@ -709,18 +709,28 @@ class FCOS(nn.Module):
             )
             # Step 1:
             # Replace "pass" statement with your code
+            level_pred_classes = torch.argmax(level_cls_logits, dim=1)
+            level_pred_scores = level_pred_scores[torch.arange(level_pred_scores.shape[0]), level_pred_classes]
             pass
 
             # Step 2:
             # Replace "pass" statement with your code
+            level_pred_classes = level_pred_classes[level_pred_scores > test_score_thresh]
             pass
 
             # Step 3:
-            # Replace "pass" statement with your code
-            pass
+            level_pred_boxes = fcos_apply_deltas_to_locations(level_deltas,\
+             level_locations, stride=self.backbone.fpn_strides[level_name])
+            level_pred_boxes = level_pred_boxes[level_pred_scores > test_score_thresh]
+            level_pred_scores = level_pred_scores[level_pred_scores > test_score_thresh]
 
             # Step 4: Use `images` to get (height, width) for clipping.
             # Replace "pass" statement with your code
+            B, C, H, W = images.shape
+            level_pred_boxes[:, 0] = level_pred_boxes[:, 0].clamp(min=0)
+            level_pred_boxes[:, 1] = level_pred_boxes[:, 1].clamp(min=0)
+            level_pred_boxes[:, 3] = level_pred_boxes[:, 3].clamp(max=H)
+            level_pred_boxes[:, 2] = level_pred_boxes[:, 2].clamp(max=W)
             pass
             ##################################################################
             #                          END OF YOUR CODE                      #
